@@ -12,6 +12,12 @@ from plone.restapi.deserializer import json_body
 from zope.schema import getFieldsInOrder
 from collective.easyform.api import get_actions
 from collective.easyform.interfaces import ISaveData
+import json
+
+import logging
+
+
+logger = logging.getLogger("collective.easyform.migration")
 
 
 @implementer(ISerializeToJson)
@@ -31,7 +37,15 @@ class SerializeToJson(DXContentToJson):
                 serializeable = dict()
                 storage[name] = serializeable
                 for key, value in action.getSavedFormInputItems():
-                    serializeable[key] = value
+                    try:
+                        json.dumps(value)
+                        serializeable[key] = value
+                    except TypeError:
+                        logger.exception(
+                            "saved data serialization issue for {}".format(
+                                self.context.absolute_url()
+                            )
+                        )
         if storage:
             result["savedDataStorage"] = storage
 
@@ -40,23 +54,26 @@ class SerializeToJson(DXContentToJson):
 @adapter(IEasyForm, Interface)
 class DeserializeFromJson(DXContentFromJson):
     def __call__(
-        self, validate_all=False, data=None, create=False, mask_validation_errors=True
+        self,
+        validate_all=False,
+        data=None,
+        create=False,
     ):  # noqa: ignore=C901
 
         if data is None:
             data = json_body(self.request)
 
-        super(DeserializeFromJson, self).__call__(
-            validate_all, data, create, mask_validation_errors
-        )
+        super(DeserializeFromJson, self).__call__(validate_all, data, create)
 
         self.deserializeSavedData(data)
+        return self.context
 
     def deserializeSavedData(self, data):
-        if hasattr(data, "savedDataStorage"):
+        if data.has_key("savedDataStorage"):
+            storage = data["savedDataStorage"]
             actions = getFieldsInOrder(get_actions(self.context))
             for name, action in actions:
-                if ISaveData.providedBy(action):
-                    savedData = data.savedDataStorage[name]
+                if ISaveData.providedBy(action) and storage.has_key(name):
+                    savedData = storage[name]
                     for key, value in savedData.items():
-                        action.setDataRow(key, value)
+                        action.setDataRow(int(key), value)
