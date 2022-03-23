@@ -62,7 +62,12 @@ def append_node(field, name, value):
     node = etree.SubElement(field, name)
     if isinstance(value, (list, tuple)):
         value = u" ".join(value)
-    node.text = value
+    try:  
+        node.text = safe_unicode(value)
+    except Exception as e:
+        logger.error("Errore di conversione XML: {} ".format(e))
+        node.text = u""
+    
     return node
 
 
@@ -137,13 +142,14 @@ def convert_tales_expressions(value):
         return u"python:member and member.id or ''"
     return value
 
+from Products.CMFPlone.utils import safe_unicode
 
 def to_text(value):
     if isinstance(value, (list, tuple)):
         return [to_text(v) for v in value]
     value = str(value)
     if six.PY2:
-        value = value.decode("utf8")
+        value = safe_unicode(value)
     return value
 
 
@@ -168,7 +174,9 @@ TYPES_MAPPING = {
     ),
     "FormFileField": Type("plone.namedfile.field.NamedBlobFile", append_field),
     "FormCaptchaField": Type("collective.easyform.fields.ReCaptcha", append_field),
-    "FieldsetStart": Type("", append_fieldset),
+    'CaptchaField': Type('collective.easyform.fields.ReCaptcha', append_field),
+    
+    "FieldsetStart": Type("collective.easyform.fields.Label", append_label_field),
     "FieldsetEnd": Type("", None),
 }
 
@@ -236,7 +244,7 @@ def fields_model(ploneformgen):
     schema = model.find("{http://namespaces.plone.org/supermodel/schema}schema")
     for fieldname, properties in pfg_fields(ploneformgen):
         portal_type = properties["_portal_type"]
-        if portal_type == "FieldsetEnd":
+        if portal_type == "FieldsetEnd_":
             schema = schema.getparent()
             continue
 
@@ -270,7 +278,7 @@ def fields_model(ploneformgen):
 
             prop.handler(field, prop.name, value)
 
-        if portal_type == "FieldsetStart":
+        if portal_type == "FieldsetStart_":
             schema = field
 
     return etree.tostring(model, pretty_print=True)

@@ -59,7 +59,13 @@ class PloneFormGenMigrator(ATCTContentMigrator):
         self.new.fields_model = fields_model(self.old)
         self.new.actions_model = actions_model(self.old)
 
-        migrate_saved_data(self.old, self.new)
+        try:
+            migrate_saved_data(self.old, self.new)
+        except Exception as e:
+            logger.error(e)
+            path = '/'.join(self.old.getPhysicalPath())
+            logger.error('non riesco a migrare save data {}'.format(path))        
+        
 
     def migrate(self, unittest=0):
         super(PloneFormGenMigrator, self).migrate()
