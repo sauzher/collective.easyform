@@ -4,7 +4,8 @@ Changelog
 3.2.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix missing ServerSide flagged fields in custom action scripts 
+  [sauzher]
 
 
 3.2.1 (2022-12-01)
